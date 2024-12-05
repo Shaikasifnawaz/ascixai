@@ -11,9 +11,7 @@ load_dotenv()
 
 # Set up the Flask app
 app = Flask(__name__)
-CORS(app, resources={
-    r"/*": {"origins": ["http://localhost:3000", "https://asci.meanhost.in"]}
-})
+CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://asci.meanhost.in"]}})
 
 # Get the XAI API key from the environment variables
 XAI_API_KEY = os.getenv("XAI_API_KEY")
@@ -58,10 +56,6 @@ def get_html(text: str, is_table: bool = False) -> str:
     lines = text.split('\n')
     html_output = """<div style="max-width: 1000px; padding: 15px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; justify-content: center; overflow-x: auto;">"""
     
-    # If is_table is True, start the table
-    if is_table:
-        html_output += "<table style='border-collapse: collapse; width: 100%;'>"
-
     list_open = False
     table_open = False
     for line in lines:
@@ -69,15 +63,16 @@ def get_html(text: str, is_table: bool = False) -> str:
         if not line:
             continue  # Skip blank lines
 
-        # Check for markdown table structure
+        # Handle markdown tables
         if "|" in line:
             if not table_open:
-                html_output += "<tr>"  # Start a table row for the first table line
+                html_output += "<table style='border-collapse: collapse; width: 100%;'>"  # Start table
                 table_open = True
 
             # Detect table header (usually separated by dashes)
             if "-" in line:
                 headers = line.split("|")
+                html_output += "<tr>"
                 for header in headers:
                     html_output += f"<th style='border: 1px solid black; padding: 5px; text-align: left;'>{escape_html(header.strip())}</th>"
                 html_output += "</tr>"
@@ -86,38 +81,43 @@ def get_html(text: str, is_table: bool = False) -> str:
                 html_output += "<tr>"
                 for cell in cells:
                     cell_content = cell.strip()
-                    if cell_content:  # Only add <td> if the content is not empty
+                    if cell_content:
                         html_output += f"<td style='border: 1px solid black; padding: 5px;'>{escape_html(cell_content)}</td>"
                 html_output += "</tr>"
 
-        # Handle other markdown formats
-        elif line.startswith("# "):
+        # Handle headings
+        elif line.startswith("# "):  # <h2> for # headings
             html_output += f'<h2>{escape_html(line[2:])}</h2>'
-        elif line.startswith("## "):
+        elif line.startswith("## "):  # <h3> for ## headings
             html_output += f'<h3>{escape_html(line[3:])}</h3>'
-        elif line.startswith("### "):
-            html_output += f'<h4>{escape_html(line[4:])}</h4>' 
+        elif line.startswith("### "):  # <h4> for ### headings
+            html_output += f'<h4>{escape_html(line[4:])}</h4>'
+        elif line.startswith("#### "):  # <h5> for #### headings
+            html_output += f'<h5>{escape_html(line[5:])}</h5>'
+        elif line.startswith("##### "):  # <h6> for ##### headings
+            html_output += f'<h6>{escape_html(line[6:])}</h6>'
+
+        # Handle bold text
         elif line.startswith("**") and line.endswith("**"):
             html_output += f'<strong>{escape_html(line[2:-2])}</strong>'
+        
+        # Handle unordered lists
         elif line.startswith("* "):
             if not list_open:
                 html_output += '<ul>'
                 list_open = True
             html_output += f'<li>{escape_html(line[2:])}</li>'
+        
+        # Handle other content (regular paragraphs)
         else:
             if list_open:
                 html_output += '</ul>'
                 list_open = False
 
             line = handle_links(escape_html(line))
+            html_output += f'<p style="margin-bottom: 10px;">{line}</p>'
 
-            if is_table:
-                # Convert line into a table row if 'is_table' is True
-                html_output += f"<tr><td>{line}</td></tr>"
-            else:
-                html_output += f'<div style="margin-bottom: 10px;">{line}</div>'
-
-    # Close the table if 'is_table' is True
+    # Close the table if open
     if table_open:
         html_output += "</table>"
 
@@ -167,10 +167,7 @@ def chat():
     # Extract content from Word files
     try:
         word_file_1 = './AMRUT-Operational-Guidelines.docx'
-
         content_1 = extract_text_from_word(word_file_1)
-
-        # Combine Word file content
         relevant_text = content_1 + "\n"
     except FileNotFoundError as fnfe:
         return jsonify({"error": str(fnfe)}), 404
@@ -182,7 +179,6 @@ def chat():
 
     # Define the API URL
     api_url = "https://api.x.ai/v1/chat/completions"
-
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {XAI_API_KEY}",
@@ -236,7 +232,7 @@ def chat():
             return jsonify({"error": "API request failed"}), 500
 
     except requests.exceptions.RequestException as e:
-        return jsonify({"error": f"Error making API request: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
