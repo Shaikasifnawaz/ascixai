@@ -228,14 +228,15 @@ def chat():
 
                 return jsonify({"response": table_html})
 
-            return jsonify({"response": response_text})
+            # Render non-table response as HTML
+            html_response = get_html(response_text)
+            return jsonify({"response": html_response})
 
         else:
-            return jsonify({"error": "Error with API request"}), response.status_code
+            return jsonify({"error": "API request failed"}), 500
 
     except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
-
+        return jsonify({"error": f"Error making API request: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+    app.run(debug=True, port=5000)
